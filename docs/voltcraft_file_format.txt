@@ -1,0 +1,20 @@
+1. Beginning of a data file
+E0 C5 EA
+
+2. End of data in a data file
+FF FF FF FF
+
+3. Decode start time
+Month = XX (1 byte)
+Day = XX (1 byte)
+Year = XX (1 byte) + 2000
+Hour = XX (1 bytes)
+Minute = XX (1 bytes)
+
+4. Decode power parameters (multiple)
+Voltage = XX XX (2 bytes) / 10 (volts)
+Current = XX XX (2 bytes) / 1000 (amperes)
+Powerfactor = XX (1 byte) / 100 (cosPHI)
+Power = Voltage * Current * PowerFactor / 1000 (kW)
+ApparentPower = Voltage * Current / 1000 (kVA)
+Timestamp = start time + index (each sample is taken at 1 minute intervals)
