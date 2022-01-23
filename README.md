@@ -1,2 +1,2 @@
-# voltcraft-energy-decoder
+# voltcraft-energy-decoder (WIP - work in progress)
  Decoder for Voltcraft Energy Logger 4000 written in Rust
