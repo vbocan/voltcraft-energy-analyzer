@@ -115,6 +115,8 @@ pub struct VoltcraftStatistics {
 }
 
 impl VoltcraftStatistics {
+    //TODO: - Each day: Total power consumption, min and max voltage, max power 
+    //TODO: - All days: Total power consumption and day average, min and max voltage, max power
     pub fn new(power_data: Vec<PowerItem>) -> VoltcraftStatistics {
         VoltcraftStatistics { power_data }
     }
