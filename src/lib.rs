@@ -1,5 +1,6 @@
-use chrono::{DateTime, Duration, Local, TimeZone};
+use chrono::{Date, DateTime, Duration, Local, TimeZone};
 use std::cmp::Ordering;
+use std::collections::HashSet;
 use std::fs;
 extern crate chrono;
 
@@ -115,10 +116,31 @@ pub struct VoltcraftStatistics {
 }
 
 impl VoltcraftStatistics {
-    //TODO: - Each day: Total power consumption, min and max voltage, max power 
+    //TODO: - Each day: Total power consumption, min and max voltage, average voltage, max power, average power
     //TODO: - All days: Total power consumption and day average, min and max voltage, max power
     pub fn new(power_data: Vec<PowerItem>) -> VoltcraftStatistics {
         VoltcraftStatistics { power_data }
+    }
+
+    pub fn distinct_days(&self) -> Vec<Date<Local>> {
+        let mut days = self
+            .power_data
+            .iter()
+            .map(|d| d.timestamp.date())
+            .collect::<HashSet<_>>()
+            .into_iter()
+            .collect::<Vec<_>>();
+        days.sort();
+        days
+    }
+
+    pub fn filter_power_data(&self, day: &Date<Local>) -> Vec<&PowerItem> {
+        let filtered_data = self
+            .power_data
+            .iter()
+            .filter(|d| *day == d.timestamp.date())
+            .collect::<Vec<_>>();
+        filtered_data
     }
 
     pub fn voltage_minmax(&self) -> (f64, f64) {

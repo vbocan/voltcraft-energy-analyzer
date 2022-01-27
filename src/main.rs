@@ -1,4 +1,4 @@
-use voltcraft_energy_decoder::{PowerItem, VoltcraftData};
+use voltcraft_energy_decoder::{PowerItem, VoltcraftData, VoltcraftStatistics};
 extern crate glob;
 use glob::glob;
 
@@ -14,15 +14,23 @@ fn main() {
         power_items.append(&mut pis);
     }
 
-    println!("Found {} power items.", power_items.len());
-    let mints = power_items.iter().min_by_key(|x| x.timestamp);
-    let maxts = power_items.iter().max_by_key(|x| x.timestamp);
-    println!("Start time {:?}", mints.unwrap().timestamp);
-    println!("End time {:?}", maxts.unwrap().timestamp);
-    // Sort power items chronologically
-    power_items.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
-
-    for p in power_items.iter().take(5) {
-        println!("{:?}", &p);
+    let stats = VoltcraftStatistics::new(power_items);
+    let distinct_days = stats.distinct_days();
+    for day in distinct_days {
+        println!("Processing day {}", day);
+        let pitems = stats.filter_power_data(&day);
+        println!("There are {} items in that day.", pitems.len());
     }
+
+    //println!("Found {} power items.", power_items.len());
+    //let mints = power_items.iter().min_by_key(|x| x.timestamp);
+    //let maxts = power_items.iter().max_by_key(|x| x.timestamp);
+    //println!("Start time {:?}", mints.unwrap().timestamp);
+    //println!("End time {:?}", maxts.unwrap().timestamp);
+    // // Sort power items chronologically
+    // power_items.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+
+    // for p in power_items.iter().take(5) {
+    //     println!("{:?}", &p);
+    // }
 }
