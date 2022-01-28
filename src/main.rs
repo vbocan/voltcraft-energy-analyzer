@@ -1,9 +1,9 @@
-use voltcraft_energy_decoder::{PowerItem, VoltcraftData, VoltcraftStatistics};
+use voltcraft_energy_decoder::{PowerEvent, VoltcraftData, VoltcraftStatistics};
 extern crate glob;
 use glob::glob;
 
 fn main() {
-    let mut power_items = Vec::<PowerItem>::new();
+    let mut power_items = Vec::<PowerEvent>::new();
 
     for e in glob("data/*").unwrap().filter_map(Result::ok) {
         let file = e.display().to_string();
@@ -14,23 +14,99 @@ fn main() {
         power_items.append(&mut pis);
     }
 
-    let stats = VoltcraftStatistics::new(power_items);
-    let distinct_days = stats.distinct_days();
-    for day in distinct_days {
-        println!("Processing day {}", day);
-        let pitems = stats.filter_power_data(&day);
-        println!("There are {} items in that day.", pitems.len());
+    let stats = VoltcraftStatistics::new(&power_items);
+    let os = stats.overall_stats();
+    for pi in power_items.iter().take(5){
+        println!("{:?}", pi);
     }
 
-    //println!("Found {} power items.", power_items.len());
-    //let mints = power_items.iter().min_by_key(|x| x.timestamp);
-    //let maxts = power_items.iter().max_by_key(|x| x.timestamp);
-    //println!("Start time {:?}", mints.unwrap().timestamp);
-    //println!("End time {:?}", maxts.unwrap().timestamp);
-    // // Sort power items chronologically
-    // power_items.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+    println!("    OVERALL");
 
-    // for p in power_items.iter().take(5) {
-    //     println!("{:?}", &p);
-    // }
+    println!("ACTIVE POWER ---------------------------------------------");
+    println!(
+        "Total active energy consumption: {:.2} kWh.",
+        os.total_active_power
+    );
+    println!(
+        "Maximum power was {:.2} kW and occured on {}.",
+        os.max_active_power.power, os.max_active_power.timestamp
+    );
+    println!(
+        "Average power during the day: {:.2} kW.",
+        os.avg_active_power
+    );
+
+    println!("APPARENT POWER -------------------------------------------");
+    println!(
+        "Total apparent power consumed: {:.2} kVAh.",
+        os.total_apparent_power
+    );
+    println!(
+        "Maximum apparent power was {:.2} kVA and occured on {}.",
+        os.max_apparent_power.power, os.max_apparent_power.timestamp
+    );
+    println!(
+        "Average apparent power during the day: {:.2} kVA.",
+        os.avg_apparent_power
+    );
+
+    println!("VOLTAGE --------------------------------------------------");
+    println!(
+        "Minimum voltage was {:.2}V and occured on {}.",
+        os.min_voltage.voltage, os.min_voltage.timestamp
+    );
+    println!(
+        "Maximum voltage was {:.2}V and occured on {}.",
+        os.max_voltage.voltage, os.max_voltage.timestamp
+    );
+    println!("Average voltage during the day: {:.2}V.", os.avg_voltage);
+    println!("");
+
+    let ds = stats.daily_stats();
+    for interval in ds {
+        println!("    [Date: {:?}]", interval.date);
+
+        println!("ACTIVE POWER ---------------------------------------------");
+        println!(
+            "Total active energy consumption: {:.2} kWh.",
+            interval.stats.total_active_power
+        );
+        println!(
+            "Maximum power was {:.2} kW and occured on {}.",
+            interval.stats.max_active_power.power, interval.stats.max_active_power.timestamp
+        );
+        println!(
+            "Average power during the day: {:.2} kW.",
+            interval.stats.avg_active_power
+        );
+
+        println!("APPARENT POWER -------------------------------------------");
+        println!(
+            "Total apparent power consumed: {:.2} kVAh.",
+            interval.stats.total_apparent_power
+        );
+        println!(
+            "Maximum apparent power was {:.2} kVA and occured on {}.",
+            interval.stats.max_apparent_power.power, interval.stats.max_apparent_power.timestamp
+        );
+        println!(
+            "Average apparent power during the day: {:.2} kVA.",
+            interval.stats.avg_apparent_power
+        );
+
+        println!("VOLTAGE --------------------------------------------------");
+        println!(
+            "Minimum voltage was {:.2}V and occured on {}.",
+            interval.stats.min_voltage.voltage, interval.stats.min_voltage.timestamp
+        );
+        println!(
+            "Maximum voltage was {:.2}V and occured on {}.",
+            interval.stats.max_voltage.voltage, interval.stats.max_voltage.timestamp
+        );
+        println!(
+            "Average voltage during the day: {:.2}V.",
+            interval.stats.avg_voltage
+        );
+        println!("");
+    }
 }

@@ -11,8 +11,8 @@ pub struct VoltcraftData {
     raw_data: Vec<u8>,
 }
 
-#[derive(Debug)]
-pub struct PowerItem {
+#[derive(Debug, Copy, Clone)]
+pub struct PowerEvent {
     pub timestamp: chrono::DateTime<Local>, // timestamp
     pub voltage: f64,                       // volts
     pub current: f64,                       // ampers
@@ -34,7 +34,7 @@ impl VoltcraftData {
         VoltcraftData { raw_data }
     }
 
-    pub fn parse(&self) -> Result<Vec<PowerItem>, &'static str> {
+    pub fn parse(&self) -> Result<Vec<PowerEvent>, &'static str> {
         // Make sure we parse valid Voltcraft data
         if !self.is_valid() {
             return Err("Invalid data (not a Voltcraft file)");
@@ -48,7 +48,7 @@ impl VoltcraftData {
         let mut minute_increment = 0;
         offset += 5;
         // Decode power items until "end of data" (#FF FF FF FF) is encountered
-        let mut result = Vec::<PowerItem>::new();
+        let mut result = Vec::<PowerEvent>::new();
         loop {
             if self.is_endofdata(offset) {
                 break;
@@ -57,7 +57,7 @@ impl VoltcraftData {
             let power_timestamp = start_time + Duration::minutes(minute_increment);
             minute_increment += 1; // increment time offset
             offset += 5; // increment byte offset
-            result.push(PowerItem {
+            result.push(PowerEvent {
                 timestamp: power_timestamp,
                 voltage: power_data.0,
                 current: power_data.1,
@@ -111,26 +111,52 @@ impl VoltcraftData {
     }
 }
 
-pub struct VoltcraftStatistics {
-    power_data: Vec<PowerItem>,
+pub struct VoltcraftStatistics<'a> {
+    power_data: &'a Vec<PowerEvent>,
+}
+
+#[derive(Debug, Copy, Clone)]
+pub struct PowerStats {
+    pub total_active_power: f64,      // total active power (kWh)
+    pub avg_active_power: f64,        // average active power (kW)
+    pub max_active_power: PowerEvent, // maxiumum active power
+
+    pub total_apparent_power: f64,      // total apparent power (kWh)
+    pub avg_apparent_power: f64,        // average apparent power (kW)
+    pub max_apparent_power: PowerEvent, // maxiumum apparent power
+
+    pub min_voltage: PowerEvent, // minimum voltage
+    pub max_voltage: PowerEvent, // maximum voltage
+    pub avg_voltage: f64,        // average voltage
 }
 
 #[derive(Debug)]
-pub struct StatsItem {
-    pub total_power: f64,   // total power (kWh)
-    pub average_power: f64, // average power (kW)
-    pub total_apparent_power: f64,   // total apparent power (kVAh)
-    pub average_power: f64, // average power (kW)
+pub struct PowerInterval {
+    pub date: Date<Local>,
+    pub stats: PowerStats,
 }
 
-impl VoltcraftStatistics {
-    //TODO: - Each day: Total power consumption, min and max voltage, average voltage, max power, average power
-    //TODO: - All days: Total power consumption and day average, min and max voltage, max power
-    pub fn new(power_data: Vec<PowerItem>) -> VoltcraftStatistics {
+impl<'a> VoltcraftStatistics<'a> {
+    pub fn new(power_data: &Vec<PowerEvent>) -> VoltcraftStatistics {
         VoltcraftStatistics { power_data }
     }
 
-    pub fn distinct_days(&self) -> Vec<Date<Local>> {
+    pub fn daily_stats(&self) -> Vec<PowerInterval> {
+        // First we need the individual days in the interval
+        let days = self.distinct_days();
+        return days
+            .into_iter()
+            .map(|d| return (d, self.filter_power_data(&d))) // Filter the power items corresponding to the current date
+            .map(|(d, e)| return (d, VoltcraftStatistics::compute_stats(&e))) // Compute statistics on the filtered power items
+            .map(|(d, r)| PowerInterval { date: d, stats: r }) // And finally build a structure to hold both the date and computed statistics
+            .collect::<Vec<_>>();
+    }
+
+    pub fn overall_stats(&self) -> PowerStats {
+        VoltcraftStatistics::compute_stats(&self.power_data)
+    }
+
+    fn distinct_days(&self) -> Vec<Date<Local>> {
         let mut days = self
             .power_data
             .iter()
@@ -142,47 +168,60 @@ impl VoltcraftStatistics {
         days
     }
 
-    pub fn filter_power_data(&self, day: &Date<Local>) -> Vec<&PowerItem> {
+    fn filter_power_data(&self, day: &Date<Local>) -> Vec<PowerEvent> {
         let filtered_data = self
             .power_data
             .iter()
             .filter(|d| *day == d.timestamp.date())
+            .map(|x| *x)
             .collect::<Vec<_>>();
         filtered_data
     }
 
-    // Total power consumption, min and max voltage, average voltage, max power, average power
-    pub fn compute_stats(power_items: &Vec<PowerItem>) -> (f64, f64) {
-        let total_power = &power_items.into_iter().fold(0f64, |sum, x| sum + x.power);
-        let average_power = total_power / power_items.len() as f64;
-        let total_apparent_power = &power_items
+    // Compute power stats on the given power events
+    pub fn compute_stats(power_items: &Vec<PowerEvent>) -> PowerStats {
+        // Total active power (in kWh) = (sum of instantaneous powers) * (number of minutes of the entire time span) / 60
+        let power_sum = power_items.into_iter().fold(0f64, |sum, x| sum + x.power);        
+        let total_active_power = power_sum / 60f64; // Total active power consumption (kWh)
+        let avg_active_power = power_sum / power_items.len() as f64; // Average power (kW)
+        let max_active_power = power_items
+            .into_iter()
+            .max_by(|a, b| a.power.partial_cmp(&b.power).unwrap())
+            .unwrap(); // Maximum active power (kW)
+
+        // Total apparent power (in kVAh) = (sum of instantaneous apparent powers) * (number of minutes of the entire time span) / 60
+        let apparent_power_sum = power_items
             .into_iter()
             .fold(0f64, |sum, x| sum + x.apparent_power);
-        let average_apparent_power = total_apparent_power / power_items.len() as f64;
-        let min_voltage = power_items
-            .iter()
-            .min_by(|a, b| a.voltage.partial_cmp(&b.voltage).unwrap())
-            .unwrap()
-            .voltage;
-        let max_voltage = power_items
-            .iter()
-            .max_by(|a, b| a.voltage.partial_cmp(&b.voltage).unwrap())
-            .unwrap()
-            .voltage;
-        let avg_voltage = &power_items.into_iter().fold(0f64, |sum, x| sum + x.voltage)
-            / power_items.len() as f64;
-        let max_power = power_items
-            .iter()
-            .max_by(|a, b| a.power.partial_cmp(&b.power).unwrap())
-            .unwrap()
-            .power;
+        let total_apparent_power = apparent_power_sum / 60f64; // Total apparent power consumption (kVAh)
+        let avg_apparent_power = apparent_power_sum / power_items.len() as f64; // Average power (kVA)
         let max_apparent_power = power_items
-            .iter()
+            .into_iter()
             .max_by(|a, b| a.apparent_power.partial_cmp(&b.apparent_power).unwrap())
-            .unwrap()
-            .apparent_power;
+            .unwrap(); // Maximum apparent power (kVA)
 
-        (min_voltage, max_voltage)
+        let min_voltage = power_items
+            .into_iter()
+            .min_by(|a, b| a.voltage.partial_cmp(&b.voltage).unwrap())
+            .unwrap(); // Minimum voltage (V)
+        let max_voltage = power_items
+            .into_iter()
+            .max_by(|a, b| a.voltage.partial_cmp(&b.voltage).unwrap())
+            .unwrap(); // Maximum voltage (V)
+        let avg_voltage = &power_items.into_iter().fold(0f64, |sum, x| sum + x.voltage)
+            / power_items.len() as f64; // Average voltage (V)
+
+        PowerStats {
+            total_active_power,
+            avg_active_power,
+            max_active_power: *max_active_power,
+            total_apparent_power,
+            avg_apparent_power,
+            max_apparent_power: *max_apparent_power,
+            min_voltage: *min_voltage,
+            max_voltage: *max_voltage,
+            avg_voltage,
+        }
     }
 }
 
@@ -220,15 +259,5 @@ mod tests {
         assert_eq!(pw.0, 224.6);
         assert_eq!(pw.1, 0.446);
         assert_eq!(pw.2, 0.87);
-    }
-
-    #[test]
-    fn voltcraft_voltage_minmax() {
-        let vd = VoltcraftData::from_raw(TESTDATA.to_vec());
-        let parsed_data = vd.parse().unwrap();
-        let stats = VoltcraftStatistics::new(parsed_data);
-        let voltage_stats = stats.voltage_minmax();
-        assert_eq!(voltage_stats.0, 224.6);
-        assert_eq!(voltage_stats.1, 224.6);
     }
 }
