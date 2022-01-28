@@ -115,6 +115,14 @@ pub struct VoltcraftStatistics {
     power_data: Vec<PowerItem>,
 }
 
+#[derive(Debug)]
+pub struct StatsItem {
+    pub total_power: f64,   // total power (kWh)
+    pub average_power: f64, // average power (kW)
+    pub total_apparent_power: f64,   // total apparent power (kVAh)
+    pub average_power: f64, // average power (kW)
+}
+
 impl VoltcraftStatistics {
     //TODO: - Each day: Total power consumption, min and max voltage, average voltage, max power, average power
     //TODO: - All days: Total power consumption and day average, min and max voltage, max power
@@ -143,19 +151,36 @@ impl VoltcraftStatistics {
         filtered_data
     }
 
-    pub fn voltage_minmax(&self) -> (f64, f64) {
-        let min_voltage = self
-            .power_data
+    // Total power consumption, min and max voltage, average voltage, max power, average power
+    pub fn compute_stats(power_items: &Vec<PowerItem>) -> (f64, f64) {
+        let total_power = &power_items.into_iter().fold(0f64, |sum, x| sum + x.power);
+        let average_power = total_power / power_items.len() as f64;
+        let total_apparent_power = &power_items
+            .into_iter()
+            .fold(0f64, |sum, x| sum + x.apparent_power);
+        let average_apparent_power = total_apparent_power / power_items.len() as f64;
+        let min_voltage = power_items
             .iter()
             .min_by(|a, b| a.voltage.partial_cmp(&b.voltage).unwrap())
             .unwrap()
             .voltage;
-        let max_voltage = self
-            .power_data
+        let max_voltage = power_items
             .iter()
             .max_by(|a, b| a.voltage.partial_cmp(&b.voltage).unwrap())
             .unwrap()
             .voltage;
+        let avg_voltage = &power_items.into_iter().fold(0f64, |sum, x| sum + x.voltage)
+            / power_items.len() as f64;
+        let max_power = power_items
+            .iter()
+            .max_by(|a, b| a.power.partial_cmp(&b.power).unwrap())
+            .unwrap()
+            .power;
+        let max_apparent_power = power_items
+            .iter()
+            .max_by(|a, b| a.apparent_power.partial_cmp(&b.apparent_power).unwrap())
+            .unwrap()
+            .apparent_power;
 
         (min_voltage, max_voltage)
     }
