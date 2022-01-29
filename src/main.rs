@@ -1,27 +1,34 @@
+use std::fs::OpenOptions;
+use std::io::Write;
 use voltcraft_energy_decoder::{PowerEvent, VoltcraftData, VoltcraftStatistics};
 extern crate glob;
 use glob::glob;
 
 fn main() {
-    let mut power_items = Vec::<PowerEvent>::new();
+    let mut power_events = Vec::<PowerEvent>::new();
 
     for e in glob("data/*").unwrap().filter_map(Result::ok) {
         let file = e.display().to_string();
         println!("Processing: {}", file);
         let vd = VoltcraftData::from_file(&file).unwrap();
         let mut pis = vd.parse().unwrap();
-
-        power_items.append(&mut pis);
+        power_events.append(&mut pis);
     }
 
-    let stats = VoltcraftStatistics::new(&power_items);
-    let os = stats.overall_stats();
-    for pi in power_items.iter().take(5){
-        println!("{:?}", pi);
+    // Chronologically sort power items (we need this to spot power blackouts)
+    power_events.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+    // TODO: Write power events to file
+    write_to_file(&power_events);
+    // Write blackouts
+    let stats = VoltcraftStatistics::new(&mut power_events);
+    println!("    BLACKOUTS");
+    let blackouts = stats.blackout_stats();
+    for bo in blackouts {
+        println!("{:?}", bo);
     }
-
+    // Write overall statistics
     println!("    OVERALL");
-
+    let os = stats.overall_stats();
     println!("ACTIVE POWER ---------------------------------------------");
     println!(
         "Total active energy consumption: {:.2} kWh.",
@@ -62,6 +69,7 @@ fn main() {
     println!("Average voltage during the day: {:.2}V.", os.avg_voltage);
     println!("");
 
+    // Write daily statistics
     let ds = stats.daily_stats();
     for interval in ds {
         println!("    [Date: {:?}]", interval.date);
@@ -108,5 +116,20 @@ fn main() {
             interval.stats.avg_voltage
         );
         println!("");
+    }
+}
+
+fn write_to_file(power_events: &Vec<PowerEvent>) {    
+    let mut f = OpenOptions::new()
+        .append(true)
+        .create(true) // Optionally create the file if it doesn't already exist
+        .open("data/output.txt")
+        .expect("Unable to open/create file");
+    for pe in power_events {
+        let fs = format!(
+            "[{}] U={:.1}V I={:.3}A cosPHI={:.2} P={:.3} S={:.3}\n",
+            pe.timestamp, pe.voltage, pe.current, pe.power_factor, pe.power, pe.apparent_power
+        );
+        f.write_all(fs.as_bytes()).expect("Unable to write data");
     }
 }
