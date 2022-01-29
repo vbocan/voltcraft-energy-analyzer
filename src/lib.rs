@@ -130,6 +130,12 @@ pub struct PowerStats {
     pub avg_voltage: f64,        // average voltage
 }
 
+#[derive(Debug, Copy, Clone)]
+pub struct PowerBlackout {
+    pub timestamp: chrono::DateTime<Local>, // start of blackout
+    pub duration: chrono::Duration,         // duration
+}
+
 #[derive(Debug)]
 pub struct PowerInterval {
     pub date: Date<Local>,
@@ -137,7 +143,7 @@ pub struct PowerInterval {
 }
 
 impl<'a> VoltcraftStatistics<'a> {
-    pub fn new(power_data: &Vec<PowerEvent>) -> VoltcraftStatistics {
+    pub fn new(power_data: &mut Vec<PowerEvent>) -> VoltcraftStatistics {
         VoltcraftStatistics { power_data }
     }
 
@@ -154,6 +160,10 @@ impl<'a> VoltcraftStatistics<'a> {
 
     pub fn overall_stats(&self) -> PowerStats {
         VoltcraftStatistics::compute_stats(&self.power_data)
+    }
+
+    pub fn blackout_stats(&self) -> Vec<PowerBlackout> {
+        VoltcraftStatistics::compute_blackouts(&self.power_data)
     }
 
     fn distinct_days(&self) -> Vec<Date<Local>> {
@@ -179,9 +189,9 @@ impl<'a> VoltcraftStatistics<'a> {
     }
 
     // Compute power stats on the given power events
-    pub fn compute_stats(power_items: &Vec<PowerEvent>) -> PowerStats {
+    fn compute_stats(power_items: &Vec<PowerEvent>) -> PowerStats {
         // Total active power (in kWh) = (sum of instantaneous powers) * (number of minutes of the entire time span) / 60
-        let power_sum = power_items.into_iter().fold(0f64, |sum, x| sum + x.power);        
+        let power_sum = power_items.into_iter().fold(0f64, |sum, x| sum + x.power);
         let total_active_power = power_sum / 60f64; // Total active power consumption (kWh)
         let avg_active_power = power_sum / power_items.len() as f64; // Average power (kW)
         let max_active_power = power_items
@@ -222,6 +232,19 @@ impl<'a> VoltcraftStatistics<'a> {
             max_voltage: *max_voltage,
             avg_voltage,
         }
+    }
+
+    // Compute blackout stats on the given power events
+    fn compute_blackouts(power_items: &Vec<PowerEvent>) -> Vec<PowerBlackout> {
+        power_items
+            .chunks_exact(2)
+            //.inspect(|x| println!("Power event pair: [{:?}] and [{:?}]", x[0], x[1]))
+            .filter(|p| p[1].timestamp - p[0].timestamp > Duration::minutes(1))
+            .map(|p| PowerBlackout {
+                timestamp: p[0].timestamp + Duration::minutes(1),
+                duration: p[1].timestamp - p[0].timestamp,
+            })
+            .collect()
     }
 }
 
