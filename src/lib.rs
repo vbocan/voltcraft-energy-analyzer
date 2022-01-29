@@ -238,7 +238,6 @@ impl<'a> VoltcraftStatistics<'a> {
     fn compute_blackouts(power_items: &Vec<PowerEvent>) -> Vec<PowerBlackout> {
         power_items
             .chunks_exact(2)
-            //.inspect(|x| println!("Power event pair: [{:?}] and [{:?}]", x[0], x[1]))
             .filter(|p| p[1].timestamp - p[0].timestamp > Duration::minutes(1))
             .map(|p| PowerBlackout {
                 timestamp: p[0].timestamp + Duration::minutes(1),
