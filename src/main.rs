@@ -1,8 +1,12 @@
 use std::fs::OpenOptions;
 use std::io::Write;
-use voltcraft_energy_decoder::{PowerEvent, VoltcraftData, VoltcraftStatistics};
+use voltcraft_energy_decoder::{PowerBlackout, PowerEvent, VoltcraftData, VoltcraftStatistics};
 extern crate glob;
 use glob::glob;
+
+const PARAMETER_HISTORY_FILE_TEXT: &'static str = "data/parameter_history.txt";
+//const PARAMETER_HISTORY_FILE_CSV: &'static str = "data/parameter_history.csv";
+const BLACKOUT_HISTORY_FILE_TEXT: &'static str = "data/blackout_history.txt";
 
 fn main() {
     let mut power_events = Vec::<PowerEvent>::new();
@@ -25,15 +29,13 @@ fn main() {
 
     // Chronologically sort power items (we need this to spot power blackouts)
     power_events.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
-    // Write power events to file
-    write_to_file(&power_events);
-    // Write blackouts
+    // Write power events to text file
+    save_parameter_history(PARAMETER_HISTORY_FILE_TEXT, &power_events);
+    // Compute statistics
     let stats = VoltcraftStatistics::new(&mut power_events);
-    println!("    BLACKOUTS");
     let blackouts = stats.blackout_stats();
-    for bo in blackouts {
-        println!("{:?}", bo);
-    }
+    save_blackout_history(BLACKOUT_HISTORY_FILE_TEXT, &blackouts);
+
     // Write overall statistics
     println!("    OVERALL");
     let os = stats.overall_stats();
@@ -127,17 +129,51 @@ fn main() {
     }
 }
 
-fn write_to_file(power_events: &Vec<PowerEvent>) {
+fn save_parameter_history(filename: &str, power_events: &Vec<PowerEvent>) {
     let mut f = OpenOptions::new()
         .append(true)
-        .create(true) // Optionally create the file if it doesn't already exist
-        .open("data/output.txt")
-        .expect("Unable to open/create file");
+        .create(true)
+        .open(filename)
+        .expect("Unable to create file");
+
+    f.write("== PARAMETER HISTORY ==\n\n".as_bytes())
+        .expect("Unable to write data");
     for pe in power_events {
         let fs = format!(
-            "[{}] U={:.1}V I={:.3}A cosPHI={:.2} P={:.3} S={:.3}\n",
-            pe.timestamp, pe.voltage, pe.current, pe.power_factor, pe.power, pe.apparent_power
+            "{} U={:.1}V I={:.3}A cosPHI={:.2} P={:.3} S={:.3}\n",
+            pe.timestamp.format("[%Y-%m-%d %H:%M]"),
+            pe.voltage,
+            pe.current,
+            pe.power_factor,
+            pe.power,
+            pe.apparent_power
         );
         f.write_all(fs.as_bytes()).expect("Unable to write data");
     }
+}
+
+fn save_blackout_history(filename: &str, blackout_events: &Vec<PowerBlackout>) {
+    let mut f = OpenOptions::new()
+        .append(true)
+        .create(true)
+        .open(filename)
+        .expect("Unable to create file");
+
+    f.write("== BLACKOUT HISTORY ==\n\n".as_bytes())
+        .expect("Unable to write data");
+    for be in blackout_events {
+        let fs = format!(
+            "{} Duration: {}\n",
+            be.timestamp.format("[%Y-%m-%d %H:%M]"),
+            format_duration(be.duration),
+        );
+        f.write_all(fs.as_bytes()).expect("Unable to write data");
+    }
+}
+
+fn format_duration(duration: chrono::Duration) -> String {
+    let seconds = duration.num_seconds() % 60;
+    let minutes = (duration.num_seconds() / 60) % 60;
+    let hours = (duration.num_seconds() / 60) / 60;
+    format!("{:0>2}h:{:0>2}m:{:0>2}s", hours, minutes, seconds)
 }
