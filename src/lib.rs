@@ -1,11 +1,10 @@
 use chrono::{Date, DateTime, Duration, Local, TimeZone};
+use itertools::Itertools;
 use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::fs;
 extern crate chrono;
-
-const MAGIC_NUMBER: [u8; 3] = [0xE0, 0xC5, 0xEA];
-const END_OF_DATA: [u8; 4] = [0xFF, 0xFF, 0xFF, 0xFF];
+extern crate itertools;
 
 pub struct VoltcraftData {
     raw_data: Vec<u8>,
@@ -25,7 +24,7 @@ impl VoltcraftData {
     pub fn from_file(filename: &str) -> Result<VoltcraftData, &'static str> {
         let contents = fs::read(filename);
         match contents {
-            Err(_) => return Err("Error reading file"),
+            Err(_) => return Err("File not found"),
             Ok(raw_data) => return Ok(VoltcraftData { raw_data }),
         };
     }
@@ -35,28 +34,37 @@ impl VoltcraftData {
     }
 
     pub fn parse(&self) -> Result<Vec<PowerEvent>, &'static str> {
-        // Make sure we parse valid Voltcraft data
-        if !self.is_valid() {
-            return Err("Invalid data (not a Voltcraft file)");
+        let mut result = Vec::<PowerEvent>::new();
+        // The initial offset in the data block is zero
+        let mut offset = 0;
+        // Set the initial time somewhere in the past as it will be overwritten anyway
+        let mut start_time = chrono::Local.ymd(2000, 1, 1).and_hms(0, 0, 0);
+        // For each new power event we encounter, the timestamp is increased by one minute (the Voltcraft device records parameters each minute)
+        let mut minute_increment = 0;
+
+        // Check whether we have a valid data file (the data block header should be at the beginning of the file)
+        if !self.is_datablock(offset) {
+            return Err("Invalid data file, probably not a Voltcraft file");
         }
 
-        // The data starts after the magic number
-        let mut offset = MAGIC_NUMBER.len();
-        // Decode the starting timestamp of the data.
-        // Each power item is recorded at 1 minute intervals, so we will increment the time accordingly.
-        let start_time = self.decode_timestamp(offset);
-        let mut minute_increment = 0;
-        offset += 5;
-        // Decode power items until "end of data" (#FF FF FF FF) is encountered
-        let mut result = Vec::<PowerEvent>::new();
         loop {
+            // If we encounter the beginning of a data block, decode and memorize the timestamp
+            if self.is_datablock(offset) {
+                offset += 3;
+                start_time = self.decode_timestamp(offset);
+                minute_increment = 0;
+                offset += 5;
+                continue;
+            }
+            // Check whether we have reached the end of the Voltcraft data file
             if self.is_endofdata(offset) {
                 break;
             }
             let power_data = self.decode_power(offset);
             let power_timestamp = start_time + Duration::minutes(minute_increment);
-            minute_increment += 1; // increment time offset
-            offset += 5; // increment byte offset
+            minute_increment += 1; // Increment the timestamp by 1 minute
+            offset += 5; // Increment byte offset
+
             result.push(PowerEvent {
                 timestamp: power_timestamp,
                 voltage: power_data.0,
@@ -69,12 +77,14 @@ impl VoltcraftData {
         Ok(result)
     }
 
-    fn is_valid(&self) -> bool {
-        let header = &self.raw_data[0..3];
+    fn is_datablock(&self, off: usize) -> bool {
+        const MAGIC_NUMBER: [u8; 3] = [0xE0, 0xC5, 0xEA];
+        let header = &self.raw_data[off..off + 3];
         header == MAGIC_NUMBER
     }
 
     fn is_endofdata(&self, off: usize) -> bool {
+        const END_OF_DATA: [u8; 4] = [0xFF, 0xFF, 0xFF, 0xFF];
         let eod = &self.raw_data[off..off + 4];
         eod == END_OF_DATA
     }
@@ -95,6 +105,8 @@ impl VoltcraftData {
         let voltage: [u8; 2] = self.raw_data[off..off + 2].try_into().unwrap();
         let voltage = u16::from_be_bytes(voltage);
         let voltage: f64 = voltage as f64 / 10.0; // volts
+        assert!(voltage > 150.0, "Tensiune mică mare la offset {}", off);
+        assert!(voltage < 250.0, "Tensiune mare mare la offset {}", off);
 
         // Decode current (2 bytes - Big Endian)
         let current: [u8; 2] = self.raw_data[off + 2..off + 4].try_into().unwrap();
@@ -236,14 +248,17 @@ impl<'a> VoltcraftStatistics<'a> {
 
     // Compute blackout stats on the given power events
     fn compute_blackouts(power_items: &Vec<PowerEvent>) -> Vec<PowerBlackout> {
-        power_items
-            .chunks_exact(2)
-            .filter(|p| p[1].timestamp - p[0].timestamp > Duration::minutes(1))
-            .map(|p| PowerBlackout {
-                timestamp: p[0].timestamp + Duration::minutes(1),
-                duration: p[1].timestamp - p[0].timestamp,
-            })
-            .collect()
+        let mut blackouts = Vec::new();
+        for (pe1, pe2) in power_items.iter().tuple_windows() {
+            // If the gap between two subsequent timestamps is more than a minute, we've detected a blackout
+            if pe2.timestamp - pe1.timestamp > Duration::minutes(1) {
+                blackouts.push(PowerBlackout {
+                    timestamp: pe1.timestamp + Duration::minutes(1),
+                    duration: (pe2.timestamp - pe1.timestamp) - Duration::minutes(1),
+                })
+            }
+        }
+        blackouts
     }
 }
 
@@ -258,12 +273,6 @@ const TESTDATA: [u8; 17] = [
 
 mod tests {
     use super::*;
-    #[test]
-    fn voltcraft_valid_data() {
-        let vd = VoltcraftData::from_raw(TESTDATA.to_vec());
-        assert!(vd.is_valid());
-    }
-
     #[test]
     fn voltcraft_timestamp() {
         let vd = VoltcraftData::from_raw(TESTDATA.to_vec());

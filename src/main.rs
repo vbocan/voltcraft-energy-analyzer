@@ -9,15 +9,23 @@ fn main() {
 
     for e in glob("data/*").unwrap().filter_map(Result::ok) {
         let file = e.display().to_string();
-        println!("Processing: {}", file);
-        let vd = VoltcraftData::from_file(&file).unwrap();
-        let mut pis = vd.parse().unwrap();
-        power_events.append(&mut pis);
+        println!("Processing file: {}...", file);
+        // Open the file
+        if let Ok(vdf) = VoltcraftData::from_file(&file) {
+            // Parse data
+            if let Ok(mut pev) = vdf.parse() {
+                power_events.append(&mut pev);
+            } else {
+                eprintln!("Invalid data, probably not a Voltcraft file.");
+            }
+        } else {
+            eprintln!("Failed to open file.");
+        }
     }
 
     // Chronologically sort power items (we need this to spot power blackouts)
     power_events.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
-    // TODO: Write power events to file
+    // Write power events to file
     write_to_file(&power_events);
     // Write blackouts
     let stats = VoltcraftStatistics::new(&mut power_events);
@@ -119,7 +127,7 @@ fn main() {
     }
 }
 
-fn write_to_file(power_events: &Vec<PowerEvent>) {    
+fn write_to_file(power_events: &Vec<PowerEvent>) {
     let mut f = OpenOptions::new()
         .append(true)
         .create(true) // Optionally create the file if it doesn't already exist
