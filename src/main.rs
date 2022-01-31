@@ -1,9 +1,7 @@
-use chrono::Local;
 use std::fs::File;
-use std::io::{self, Error, Write};
+use std::io::{self, Write};
 use voltcraft_energy_decoder::{
-    BlackoutInfo, DailyPowerInfo, OverallPowerInfo, PowerBlackout, PowerEvent, PowerStats,
-    VoltcraftData, VoltcraftStatistics,
+    BlackoutInfo, DailyPowerInfo, OverallPowerInfo, PowerEvent, VoltcraftData, VoltcraftStatistics,
 };
 extern crate glob;
 use glob::glob;
@@ -31,18 +29,25 @@ fn main() {
         }
     }
 
+    println!("Sorting power data...");
     // Chronologically sort power items (we need this to spot power blackouts)
     power_events.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
     // Write power events to text file
+    println!(
+        "Saving parameter history to file {}...",
+        PARAMETER_HISTORY_FILE_TEXT
+    );
     save_parameter_history(PARAMETER_HISTORY_FILE_TEXT, &power_events);
     // Compute statistics
     let stats = VoltcraftStatistics::new(&mut power_events);
+    println!("Saving statistics to file {}...", STATS_FILE_TEXT);
     save_statistics(
         STATS_FILE_TEXT,
         &stats.overall_stats(),
         &stats.daily_stats(),
         &stats.blackout_stats(),
     );
+    println!("Done.");
 }
 
 fn save_parameter_history(filename: &str, power_events: &Vec<PowerEvent>) -> Result<(), io::Error> {

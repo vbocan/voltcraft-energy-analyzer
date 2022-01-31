@@ -1,6 +1,5 @@
 use chrono::{Date, DateTime, Duration, Local, TimeZone};
 use itertools::Itertools;
-use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::fs;
 extern crate chrono;
