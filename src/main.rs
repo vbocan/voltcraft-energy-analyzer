@@ -1,12 +1,16 @@
-use std::fs::OpenOptions;
-use std::io::Write;
-use voltcraft_energy_decoder::{PowerBlackout, PowerEvent, VoltcraftData, VoltcraftStatistics};
+use chrono::Local;
+use std::fs::File;
+use std::io::{self, Error, Write};
+use voltcraft_energy_decoder::{
+    BlackoutInfo, DailyPowerInfo, OverallPowerInfo, PowerBlackout, PowerEvent, PowerStats,
+    VoltcraftData, VoltcraftStatistics,
+};
 extern crate glob;
 use glob::glob;
 
 const PARAMETER_HISTORY_FILE_TEXT: &'static str = "data/parameter_history.txt";
 //const PARAMETER_HISTORY_FILE_CSV: &'static str = "data/parameter_history.csv";
-const BLACKOUT_HISTORY_FILE_TEXT: &'static str = "data/blackout_history.txt";
+const STATS_FILE_TEXT: &'static str = "data/stats.txt";
 
 fn main() {
     let mut power_events = Vec::<PowerEvent>::new();
@@ -33,114 +37,22 @@ fn main() {
     save_parameter_history(PARAMETER_HISTORY_FILE_TEXT, &power_events);
     // Compute statistics
     let stats = VoltcraftStatistics::new(&mut power_events);
-    let blackouts = stats.blackout_stats();
-    save_blackout_history(BLACKOUT_HISTORY_FILE_TEXT, &blackouts);
-
-    // Write overall statistics
-    println!("    OVERALL");
-    let os = stats.overall_stats();
-    println!("ACTIVE POWER ---------------------------------------------");
-    println!(
-        "Total active energy consumption: {:.2} kWh.",
-        os.total_active_power
+    save_statistics(
+        STATS_FILE_TEXT,
+        &stats.overall_stats(),
+        &stats.daily_stats(),
+        &stats.blackout_stats(),
     );
-    println!(
-        "Maximum power was {:.2} kW and occured on {}.",
-        os.max_active_power.power, os.max_active_power.timestamp
-    );
-    println!(
-        "Average power during the day: {:.2} kW.",
-        os.avg_active_power
-    );
-
-    println!("APPARENT POWER -------------------------------------------");
-    println!(
-        "Total apparent power consumed: {:.2} kVAh.",
-        os.total_apparent_power
-    );
-    println!(
-        "Maximum apparent power was {:.2} kVA and occured on {}.",
-        os.max_apparent_power.power, os.max_apparent_power.timestamp
-    );
-    println!(
-        "Average apparent power during the day: {:.2} kVA.",
-        os.avg_apparent_power
-    );
-
-    println!("VOLTAGE --------------------------------------------------");
-    println!(
-        "Minimum voltage was {:.2}V and occured on {}.",
-        os.min_voltage.voltage, os.min_voltage.timestamp
-    );
-    println!(
-        "Maximum voltage was {:.2}V and occured on {}.",
-        os.max_voltage.voltage, os.max_voltage.timestamp
-    );
-    println!("Average voltage during the day: {:.2}V.", os.avg_voltage);
-    println!("");
-
-    // Write daily statistics
-    let ds = stats.daily_stats();
-    for interval in ds {
-        println!("    [Date: {:?}]", interval.date);
-
-        println!("ACTIVE POWER ---------------------------------------------");
-        println!(
-            "Total active energy consumption: {:.2} kWh.",
-            interval.stats.total_active_power
-        );
-        println!(
-            "Maximum power was {:.2} kW and occured on {}.",
-            interval.stats.max_active_power.power, interval.stats.max_active_power.timestamp
-        );
-        println!(
-            "Average power during the day: {:.2} kW.",
-            interval.stats.avg_active_power
-        );
-
-        println!("APPARENT POWER -------------------------------------------");
-        println!(
-            "Total apparent power consumed: {:.2} kVAh.",
-            interval.stats.total_apparent_power
-        );
-        println!(
-            "Maximum apparent power was {:.2} kVA and occured on {}.",
-            interval.stats.max_apparent_power.power, interval.stats.max_apparent_power.timestamp
-        );
-        println!(
-            "Average apparent power during the day: {:.2} kVA.",
-            interval.stats.avg_apparent_power
-        );
-
-        println!("VOLTAGE --------------------------------------------------");
-        println!(
-            "Minimum voltage was {:.2}V and occured on {}.",
-            interval.stats.min_voltage.voltage, interval.stats.min_voltage.timestamp
-        );
-        println!(
-            "Maximum voltage was {:.2}V and occured on {}.",
-            interval.stats.max_voltage.voltage, interval.stats.max_voltage.timestamp
-        );
-        println!(
-            "Average voltage during the day: {:.2}V.",
-            interval.stats.avg_voltage
-        );
-        println!("");
-    }
 }
 
-fn save_parameter_history(filename: &str, power_events: &Vec<PowerEvent>) {
-    let mut f = OpenOptions::new()
-        .append(true)
-        .create(true)
-        .open(filename)
-        .expect("Unable to create file");
-
-    f.write("== PARAMETER HISTORY ==\n\n".as_bytes())
-        .expect("Unable to write data");
+fn save_parameter_history(filename: &str, power_events: &Vec<PowerEvent>) -> Result<(), io::Error> {
+    let mut f = File::create(filename)?;
+    writeln!(f, "== PARAMETER HISTORY ==");
+    writeln!(f);
     for pe in power_events {
-        let fs = format!(
-            "{} U={:.1}V I={:.3}A cosPHI={:.2} P={:.3} S={:.3}\n",
+        writeln!(
+            f,
+            "{} U={:.1}V I={:.3}A cosPHI={:.2} P={:.3}kW S={:.3}kVA",
             pe.timestamp.format("[%Y-%m-%d %H:%M]"),
             pe.voltage,
             pe.current,
@@ -148,27 +60,179 @@ fn save_parameter_history(filename: &str, power_events: &Vec<PowerEvent>) {
             pe.power,
             pe.apparent_power
         );
-        f.write_all(fs.as_bytes()).expect("Unable to write data");
     }
+    Ok(())
 }
 
-fn save_blackout_history(filename: &str, blackout_events: &Vec<PowerBlackout>) {
-    let mut f = OpenOptions::new()
-        .append(true)
-        .create(true)
-        .open(filename)
-        .expect("Unable to create file");
+fn save_statistics(
+    filename: &str,
+    overall_stats: &OverallPowerInfo,
+    daily_stats: &Vec<DailyPowerInfo>,
+    blackout_stats: &BlackoutInfo,
+) -> Result<(), io::Error> {
+    let mut f = File::create(filename)?;
+    // Statistics for the entire period
+    writeln!(f, "==== OVERALL STATISTICS ==================");
+    writeln!(
+        f,
+        "Interval: {}-{} ({})",
+        overall_stats.start.format("[%Y-%m-%d %H:%M]"),
+        overall_stats.end.format("[%Y-%m-%d %H:%M]"),
+        format_duration(overall_stats.end - overall_stats.start)
+    );
+    match overall_stats.avg_daily_power_consumption {
+        None => {}
+        Some(d) => {
+            writeln!(
+                f,
+                "Average consumption: {:.2}kWh/day | Projected: {:.2}kWh/month or {:.2}kWh/year.",
+                d,
+                d * 30.0,
+                d * 365.0
+            );
+        }
+    }
+    writeln!(f);
+    writeln!(f, "- ACTIVE POWER");
+    writeln!(
+        f,
+        "Total energy consumption: {:.2}kWh.",
+        overall_stats.stats.total_active_power
+    );
+    writeln!(
+        f,
+        "Peak power was {:.2}kW and occured on {}.",
+        overall_stats.stats.max_active_power.power,
+        overall_stats
+            .stats
+            .max_active_power
+            .timestamp
+            .format("[%Y-%m-%d %H:%M]")
+    );
+    writeln!(
+        f,
+        "Minute by minute average power: {:.2}kW.",
+        overall_stats.stats.avg_active_power
+    );
+    writeln!(f);
+    writeln!(f, "- APPARENT POWER");
+    writeln!(
+        f,
+        "Total energy consumption: {:.2}kVAh.",
+        overall_stats.stats.total_apparent_power
+    );
+    writeln!(
+        f,
+        "Peak power was {:.2}kVA and occured on {}.",
+        overall_stats.stats.max_apparent_power.power,
+        overall_stats
+            .stats
+            .max_apparent_power
+            .timestamp
+            .format("[%Y-%m-%d %H:%M]")
+    );
+    writeln!(
+        f,
+        "Minute by minute average power: {:.2}kVA.",
+        overall_stats.stats.avg_apparent_power
+    );
+    writeln!(f);
+    writeln!(f, "- VOLTAGE");
+    writeln!(
+        f,
+        "Minimum voltage was {:.1}V and occured on {}.",
+        overall_stats.stats.min_voltage.voltage,
+        overall_stats
+            .stats
+            .min_voltage
+            .timestamp
+            .format("[%Y-%m-%d %H:%M]")
+    );
+    writeln!(
+        f,
+        "Maximum voltage was {:.1}V and occured on {}.",
+        overall_stats.stats.max_voltage.voltage,
+        overall_stats
+            .stats
+            .max_voltage
+            .timestamp
+            .format("[%Y-%m-%d %H:%M]")
+    );
+    writeln!(
+        f,
+        "Minute by minute average voltage: {:.1}V.",
+        overall_stats.stats.avg_voltage
+    );
+    writeln!(f);
+    writeln!(f);
 
-    f.write("== BLACKOUT HISTORY ==\n\n".as_bytes())
-        .expect("Unable to write data");
-    for be in blackout_events {
-        let fs = format!(
-            "{} Duration: {}\n",
+    writeln!(f, "==== DAILY STATISTICS ====================");
+    // Daily statistics
+    for interval in daily_stats {
+        writeln!(f, "{}", interval.date.format("[%Y-%m-%d]"));
+        writeln!(
+            f,
+            "      Total active power: {:.2}kWh  | Average: {:.2}kW  | Maximum: {:.2}kW on {}",
+            interval.stats.total_active_power,
+            interval.stats.avg_active_power,
+            interval.stats.max_active_power.power,
+            interval
+                .stats
+                .max_active_power
+                .timestamp
+                .format("[%Y-%m-%d %H:%M]")
+        );
+        writeln!(
+            f,
+            "    Total apparent power: {:.2}kVAh | Average: {:.2}kVA | Maximum: {:.2}kVA on {}",
+            interval.stats.total_active_power,
+            interval.stats.avg_active_power,
+            interval.stats.max_active_power.power,
+            interval
+                .stats
+                .max_active_power
+                .timestamp
+                .format("[%Y-%m-%d %H:%M]")
+        );
+        writeln!(
+            f,
+            "    Voltage: Average: {:.1}V | Minimum: {:.1}V on {} | Maximum: {:.1}V on {}",
+            interval.stats.avg_voltage,
+            interval.stats.min_voltage.voltage,
+            interval
+                .stats
+                .min_voltage
+                .timestamp
+                .format("[%Y-%m-%d %H:%M]"),
+            interval.stats.max_voltage.voltage,
+            interval
+                .stats
+                .max_voltage
+                .timestamp
+                .format("[%Y-%m-%d %H:%M]")
+        );
+        writeln!(f);
+    }
+
+    writeln!(f);
+    // Blackout history
+    writeln!(f, "==== BLACKOUT HISTORY ====================");
+    writeln!(
+        f,
+        "{} blackout(s) for a total of {}.",
+        blackout_stats.blackout_count,
+        format_duration(blackout_stats.total_blackout_duration)
+    );
+    writeln!(f);
+    for be in &blackout_stats.blackouts {
+        writeln!(
+            f,
+            "{} Duration: {}",
             be.timestamp.format("[%Y-%m-%d %H:%M]"),
             format_duration(be.duration),
         );
-        f.write_all(fs.as_bytes()).expect("Unable to write data");
     }
+    Ok(())
 }
 
 fn format_duration(duration: chrono::Duration) -> String {

@@ -149,9 +149,24 @@ pub struct PowerBlackout {
 }
 
 #[derive(Debug)]
-pub struct PowerInterval {
+pub struct DailyPowerInfo {
     pub date: Date<Local>,
     pub stats: PowerStats,
+}
+
+#[derive(Debug)]
+pub struct OverallPowerInfo {
+    pub start: DateTime<Local>,
+    pub end: DateTime<Local>,
+    pub stats: PowerStats,
+    pub avg_daily_power_consumption: Option<f64>, // kWh
+}
+
+#[derive(Debug)]
+pub struct BlackoutInfo {
+    pub blackout_count: usize,
+    pub total_blackout_duration: chrono::Duration,
+    pub blackouts: Vec<PowerBlackout>,
 }
 
 impl<'a> VoltcraftStatistics<'a> {
@@ -159,23 +174,51 @@ impl<'a> VoltcraftStatistics<'a> {
         VoltcraftStatistics { power_data }
     }
 
-    pub fn daily_stats(&self) -> Vec<PowerInterval> {
+    pub fn daily_stats(&self) -> Vec<DailyPowerInfo> {
         // First we need the individual days in the interval
         let days = self.distinct_days();
         return days
             .into_iter()
             .map(|d| return (d, self.filter_power_data(&d))) // Filter the power items corresponding to the current date
             .map(|(d, e)| return (d, VoltcraftStatistics::compute_stats(&e))) // Compute statistics on the filtered power items
-            .map(|(d, r)| PowerInterval { date: d, stats: r }) // And finally build a structure to hold both the date and computed statistics
+            .map(|(d, r)| DailyPowerInfo { date: d, stats: r }) // And finally build a structure to hold both the date and computed statistics
             .collect::<Vec<_>>();
     }
 
-    pub fn overall_stats(&self) -> PowerStats {
-        VoltcraftStatistics::compute_stats(&self.power_data)
+    pub fn overall_stats(&self) -> OverallPowerInfo {
+        let mut avg_daily_power_consumption = Option::None;
+        let power_stats = VoltcraftStatistics::compute_stats(&self.power_data);
+
+        // Compute the start and end of the power data
+        let start = self.power_data.first().unwrap().timestamp;
+        let end = self.power_data.last().unwrap().timestamp;
+        // Determine the average daily consumption
+        let total_duration = end - start;
+        if total_duration >= Duration::days(1) {
+            // If we have more than one day worth of power data, we can do some additional power statistics
+            avg_daily_power_consumption = Some(
+                power_stats.total_active_power / (total_duration.num_seconds() as f64 / 86400.0),
+            );
+        }
+        OverallPowerInfo {
+            start,
+            end,
+            stats: power_stats,
+            avg_daily_power_consumption,
+        }
     }
 
-    pub fn blackout_stats(&self) -> Vec<PowerBlackout> {
-        VoltcraftStatistics::compute_blackouts(&self.power_data)
+    pub fn blackout_stats(&self) -> BlackoutInfo {
+        let blackouts = &VoltcraftStatistics::compute_blackouts(&self.power_data);
+        let blackout_count = blackouts.len();
+        let total_blackout_duration = blackouts
+            .into_iter()
+            .fold(Duration::zero(), |sum, x| sum + x.duration);
+        BlackoutInfo {
+            blackout_count,
+            total_blackout_duration,
+            blackouts: blackouts.to_vec(),
+        }
     }
 
     fn distinct_days(&self) -> Vec<Date<Local>> {
@@ -202,7 +245,7 @@ impl<'a> VoltcraftStatistics<'a> {
 
     // Compute power stats on the given power events
     fn compute_stats(power_items: &Vec<PowerEvent>) -> PowerStats {
-        // Total active power (in kWh) = (sum of instantaneous powers) * (number of minutes of the entire time span) / 60
+        // Total active power (in kWh) = (sum of instantaneous powers) / 60
         let power_sum = power_items.into_iter().fold(0f64, |sum, x| sum + x.power);
         let total_active_power = power_sum / 60f64; // Total active power consumption (kWh)
         let avg_active_power = power_sum / power_items.len() as f64; // Average power (kW)
@@ -211,7 +254,7 @@ impl<'a> VoltcraftStatistics<'a> {
             .max_by(|a, b| a.power.partial_cmp(&b.power).unwrap())
             .unwrap(); // Maximum active power (kW)
 
-        // Total apparent power (in kVAh) = (sum of instantaneous apparent powers) * (number of minutes of the entire time span) / 60
+        // Total apparent power (in kVAh) = (sum of instantaneous apparent powers) / 60
         let apparent_power_sum = power_items
             .into_iter()
             .fold(0f64, |sum, x| sum + x.apparent_power);
