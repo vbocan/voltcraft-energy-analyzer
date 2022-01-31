@@ -140,6 +140,8 @@ pub struct PowerStats {
     pub min_voltage: PowerEvent, // minimum voltage
     pub max_voltage: PowerEvent, // maximum voltage
     pub avg_voltage: f64,        // average voltage
+
+    pub total_duration: chrono::Duration, // total duration (in sec) of the interval for the current statistics
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -276,6 +278,16 @@ impl<'a> VoltcraftStatistics<'a> {
         let avg_voltage = &power_items.into_iter().fold(0f64, |sum, x| sum + x.voltage)
             / power_items.len() as f64; // Average voltage (V)
 
+        let start = power_items
+            .into_iter()
+            .min_by(|a, b| a.timestamp.partial_cmp(&b.timestamp).unwrap())
+            .unwrap()
+            .timestamp; // Start timestamp
+        let end = power_items
+            .into_iter()
+            .max_by(|a, b| a.timestamp.partial_cmp(&b.timestamp).unwrap())
+            .unwrap()
+            .timestamp; // End timestamp
         PowerStats {
             total_active_power,
             avg_active_power,
@@ -286,6 +298,7 @@ impl<'a> VoltcraftStatistics<'a> {
             min_voltage: *min_voltage,
             max_voltage: *max_voltage,
             avg_voltage,
+            total_duration: (end - start) + Duration::minutes(1),
         }
     }
 

@@ -169,7 +169,13 @@ fn save_statistics(
     writeln!(f, "==== DAILY STATISTICS ====================");
     // Daily statistics
     for interval in daily_stats {
-        writeln!(f, "{}", interval.date.format("[%Y-%m-%d]"));
+        writeln!(
+            f,
+            "{} - {} recorded activity ({:.1}%)",
+            interval.date.format("[%Y-%m-%d]"),
+            format_duration(interval.stats.total_duration),
+            interval.stats.total_duration.num_seconds() as f64 * 100.0 / 86400.0
+        );
         writeln!(
             f,
             "      Total active power: {:.2}kWh  | Average: {:.2}kW  | Maximum: {:.2}kW on {}",
@@ -236,8 +242,7 @@ fn save_statistics(
 }
 
 fn format_duration(duration: chrono::Duration) -> String {
-    let seconds = duration.num_seconds() % 60;
     let minutes = (duration.num_seconds() / 60) % 60;
     let hours = (duration.num_seconds() / 60) / 60;
-    format!("{:0>2}h:{:0>2}m:{:0>2}s", hours, minutes, seconds)
+    format!("{:0>2}h:{:0>2}m", hours, minutes)
 }
