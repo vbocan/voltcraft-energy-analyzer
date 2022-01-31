@@ -3,11 +3,12 @@ use std::io::{self, Write};
 use voltcraft_energy_decoder::{
     BlackoutInfo, DailyPowerInfo, OverallPowerInfo, PowerEvent, VoltcraftData, VoltcraftStatistics,
 };
+extern crate csv;
 extern crate glob;
 use glob::glob;
 
 const PARAMETER_HISTORY_FILE_TEXT: &'static str = "data/parameter_history.txt";
-//const PARAMETER_HISTORY_FILE_CSV: &'static str = "data/parameter_history.csv";
+const PARAMETER_HISTORY_FILE_CSV: &'static str = "data/parameter_history.csv";
 const STATS_FILE_TEXT: &'static str = "data/stats.txt";
 
 fn main() {
@@ -34,10 +35,16 @@ fn main() {
     power_events.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
     // Write power events to text file
     println!(
-        "Saving parameter history to file {}...",
+        "Saving parameter history to text file {}...",
         PARAMETER_HISTORY_FILE_TEXT
     );
-    save_parameter_history(PARAMETER_HISTORY_FILE_TEXT, &power_events);
+    save_parameter_history_txt(PARAMETER_HISTORY_FILE_TEXT, &power_events);
+    // Write power events to CSV file
+    println!(
+        "Saving parameter history to CSV file {}...",
+        PARAMETER_HISTORY_FILE_CSV
+    );
+    save_parameter_history_csv(PARAMETER_HISTORY_FILE_CSV, &power_events);
     // Compute statistics
     let stats = VoltcraftStatistics::new(&mut power_events);
     println!("Saving statistics to file {}...", STATS_FILE_TEXT);
@@ -50,7 +57,10 @@ fn main() {
     println!("Done.");
 }
 
-fn save_parameter_history(filename: &str, power_events: &Vec<PowerEvent>) -> Result<(), io::Error> {
+fn save_parameter_history_txt(
+    filename: &str,
+    power_events: &Vec<PowerEvent>,
+) -> Result<(), io::Error> {
     let mut f = File::create(filename)?;
     writeln!(f, "== PARAMETER HISTORY ==");
     writeln!(f);
@@ -66,6 +76,33 @@ fn save_parameter_history(filename: &str, power_events: &Vec<PowerEvent>) -> Res
             pe.apparent_power
         );
     }
+    Ok(())
+}
+
+fn save_parameter_history_csv(
+    filename: &str,
+    power_events: &Vec<PowerEvent>,
+) -> Result<(), io::Error> {
+    let mut wtr = csv::Writer::from_path(filename)?;
+    wtr.write_record(&[
+        "Timestamp",
+        "Voltage (V)",
+        "Current (A)",
+        "cosPHI",
+        "Active Power (kW)",
+        "Apparent Power (kVA)",
+    ])?;
+    for pe in power_events {
+        wtr.write_record(&[
+            pe.timestamp.format("%Y-%m-%d %H:%M").to_string(),
+            pe.voltage.to_string(),
+            pe.current.to_string(),
+            pe.power_factor.to_string(),
+            pe.power.to_string(),
+            pe.apparent_power.to_string(),
+        ])?;
+    }
+    wtr.flush()?;
     Ok(())
 }
 
