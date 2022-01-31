@@ -243,6 +243,13 @@ fn save_statistics(
 
 fn format_duration(duration: chrono::Duration) -> String {
     let minutes = (duration.num_seconds() / 60) % 60;
-    let hours = (duration.num_seconds() / 60) / 60;
-    format!("{:0>2}h:{:0>2}m", hours, minutes)
+    let hours = (duration.num_seconds() / 3600) % 24;
+    let days = duration.num_seconds() / 86400;
+    if days > 0 {
+        format!("{:0>2}d:{:0>2}h:{:0>2}m", days, hours, minutes)
+    } else if hours > 0 {
+        format!("{:0>2}h:{:0>2}m", hours, minutes)
+    } else {
+        format!("{:0>2}m", minutes)
+    }
 }
