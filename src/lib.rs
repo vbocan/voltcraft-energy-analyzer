@@ -2,8 +2,6 @@ use chrono::{Date, DateTime, Duration, Local, TimeZone};
 use itertools::Itertools;
 use std::collections::HashSet;
 use std::fs;
-extern crate chrono;
-extern crate itertools;
 
 pub struct VoltcraftData {
     raw_data: Vec<u8>,

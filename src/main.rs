@@ -1,11 +1,10 @@
+use csv;
+use glob::glob;
 use std::fs::File;
 use std::io::{self, Write};
 use voltcraft_energy_decoder::{
     BlackoutInfo, DailyPowerInfo, OverallPowerInfo, PowerEvent, VoltcraftData, VoltcraftStatistics,
 };
-extern crate csv;
-extern crate glob;
-use glob::glob;
 
 const PARAMETER_HISTORY_FILE_TEXT: &'static str = "data/parameter_history.txt";
 const PARAMETER_HISTORY_FILE_CSV: &'static str = "data/parameter_history.csv";
