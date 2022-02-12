@@ -34,6 +34,10 @@ fn main() {
         println!("Sorting power data...");
         // Chronologically sort power items (we need this to spot power blackouts)
         power_events.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+        println!("Removing duplicates from power data...");
+        // Remove duplicate events based on timestamp
+        power_events.dedup_by(|a, b| a.timestamp == b.timestamp);
+
         // Write power events to text file
         print!(
             "Saving parameter history to text file {}...",
