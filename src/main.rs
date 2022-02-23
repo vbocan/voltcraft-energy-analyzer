@@ -7,9 +7,9 @@ use voltcraft::stats::VoltcraftStatistics;
 
 use export::{save_parameter_history_csv, save_parameter_history_txt, save_statistics};
 
-const PARAMETER_HISTORY_FILE_TEXT: &'static str = "data/parameter_history.txt";
-const PARAMETER_HISTORY_FILE_CSV: &'static str = "data/parameter_history.csv";
-const STATS_FILE_TEXT: &'static str = "data/stats.txt";
+const PARAMETER_HISTORY_FILE_TEXT: &str = "data/parameter_history.txt";
+const PARAMETER_HISTORY_FILE_CSV: &str = "data/parameter_history.csv";
+const STATS_FILE_TEXT: &str = "data/stats.txt";
 
 fn main() {
     let mut power_events = Vec::<PowerEvent>::new();
@@ -30,7 +30,7 @@ fn main() {
         }
     }
 
-    if power_events.len() > 0 {
+    if !power_events.is_empty() {
         println!("Sorting power data...");
         // Chronologically sort power items (we need this to spot power blackouts)
         power_events.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
@@ -43,7 +43,7 @@ fn main() {
             "Saving parameter history to text file {}...",
             PARAMETER_HISTORY_FILE_TEXT
         );
-        if let Ok(_) = save_parameter_history_txt(PARAMETER_HISTORY_FILE_TEXT, &power_events) {
+        if save_parameter_history_txt(PARAMETER_HISTORY_FILE_TEXT, &power_events).is_ok() {
             println!(" OK");
         } else {
             println!(" Failed!");
@@ -53,7 +53,7 @@ fn main() {
             "Saving parameter history to CSV file {}...",
             PARAMETER_HISTORY_FILE_CSV
         );
-        if let Ok(_) = save_parameter_history_csv(PARAMETER_HISTORY_FILE_CSV, &power_events) {
+        if save_parameter_history_csv(PARAMETER_HISTORY_FILE_CSV, &power_events).is_ok() {
             println!(" OK");
         } else {
             println!(" Failed!");
@@ -61,12 +61,14 @@ fn main() {
         // Compute statistics
         let stats = VoltcraftStatistics::new(&mut power_events);
         print!("Saving statistics to file {}...", STATS_FILE_TEXT);
-        if let Ok(_) = save_statistics(
+        if save_statistics(
             STATS_FILE_TEXT,
             &stats.overall_stats(),
             &stats.daily_stats(),
             &stats.blackout_stats(),
-        ) {
+        )
+        .is_ok()
+        {
             println!(" OK");
         } else {
             println!(" Failed!");
