@@ -154,11 +154,12 @@ fn main() {
 
 fn display_welcome() {
     println!(
-        "{} - {}\n{} | {}",
+        "{} - {} {}\n{} | {}",
         "Analyzer for Voltcraft Energy Logger 4000"
             .bright_white()
             .bold(),
         "v1.0".bright_yellow().bold(),
+        "(My first foray into the Rust programming language)".italic(),
         "Valer BOCAN, PhD, CSSLP".green(),
         "https://github.com/vbocan/voltcraft-energy-decoder".blue()
     );
