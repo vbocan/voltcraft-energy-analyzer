@@ -5,6 +5,7 @@ use colored::*;
 use glob::glob;
 use std::env;
 use std::fs;
+use std::time::{Duration, Instant};
 use voltcraft::data::{PowerEvent, VoltcraftData};
 use voltcraft::stats::VoltcraftStatistics;
 
@@ -67,6 +68,7 @@ fn main() {
         output_dir.bright_white()
     );
 
+    let start_time = Instant::now();
     // Initialize the vector that stores incoming power events
     let mut power_events = Vec::<PowerEvent>::new();
 
@@ -74,6 +76,7 @@ fn main() {
     input_dir.push('*');
 
     // Read the input directory and process each file
+    let mut file_count = 0;
     for e in glob(input_dir.as_str()).unwrap().filter_map(Result::ok) {
         let file = e.display().to_string();
         print!("Processing file: {}...", file);
@@ -82,6 +85,7 @@ fn main() {
             // Parse data
             if let Ok(mut pev) = vdf.parse() {
                 power_events.append(&mut pev);
+                file_count = file_count + 1;
                 println!(" {}", "Ok".green());
             } else {
                 println!(" {}", "Invalid".red());
@@ -148,6 +152,12 @@ fn main() {
         }
     } else {
         println!("{}", "No valid Voltcraft data files found.".yellow());
+    }
+
+    let duration = start_time.elapsed();
+
+    if file_count > 0 {
+        println!("Processed {} files in {:?}.", file_count, duration);
     }
     println!("{}", "Finished.".green());
 }
