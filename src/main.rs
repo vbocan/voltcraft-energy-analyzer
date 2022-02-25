@@ -11,9 +11,9 @@ use voltcraft::stats::VoltcraftStatistics;
 
 use export::{save_parameter_history_csv, save_parameter_history_txt, save_statistics};
 
-const PARAMETER_HISTORY_FILE_TEXT: &str = "parameter_history.txt";
-const PARAMETER_HISTORY_FILE_CSV: &str = "parameter_history.csv";
-const STATS_FILE_TEXT: &str = "stats.txt";
+const PARAMETER_HISTORY_FILE_TEXT: &str = "voltcraft_history.txt";
+const PARAMETER_HISTORY_FILE_CSV: &str = "voltcraft_history.csv";
+const STATS_FILE_TEXT: &str = "voltcraft_stats.txt";
 
 fn main() {
     // Print welcome text
@@ -97,15 +97,14 @@ fn main() {
 
     // Process power events accrued from the parsed data files
     if !power_events.is_empty() {
-        print!("Sorting power data...");
         // Chronologically sort power items (we need this to spot power blackouts)
+        print!("Sorting power data...");        
         power_events.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
         println!(" {}", "Done".green());
-        print!("Removing duplicates from power data...");
         // Remove duplicate events based on timestamp
+        print!("Removing duplicates from power data...");
         power_events.dedup_by(|a, b| a.timestamp == b.timestamp);
         println!(" {}", "Done".green());
-
         // Write power events to text file
         let mut target_path = output_dir.clone();
         target_path.push_str(PARAMETER_HISTORY_FILE_TEXT);
