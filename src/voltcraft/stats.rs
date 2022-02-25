@@ -59,17 +59,16 @@ impl<'a> VoltcraftStatistics<'a> {
     pub fn daily_stats(&self) -> Vec<DailyPowerInfo> {
         // First we need the individual days in the interval
         let days = self.distinct_days();
-        return days
-            .into_iter()
-            .map(|d| return (d, self.filter_power_data(&d))) // Filter the power items corresponding to the current date
-            .map(|(d, e)| return (d, VoltcraftStatistics::compute_stats(&e))) // Compute statistics on the filtered power items
+        days.into_iter()
+            .map(|d| (d, self.filter_power_data(&d))) // Filter the power items corresponding to the current date
+            .map(|(d, e)| (d, VoltcraftStatistics::compute_stats(&e))) // Compute statistics on the filtered power items
             .map(|(d, r)| DailyPowerInfo { date: d, stats: r }) // And finally build a structure to hold both the date and computed statistics
-            .collect::<Vec<_>>();
+            .collect::<Vec<_>>()
     }
 
     pub fn overall_stats(&self) -> OverallPowerInfo {
         let mut avg_daily_power_consumption = Option::None;
-        let power_stats = VoltcraftStatistics::compute_stats(&self.power_data);
+        let power_stats = VoltcraftStatistics::compute_stats(self.power_data);
 
         // Compute the start and end of the power data
         let start = self.power_data.first().unwrap().timestamp;
@@ -91,10 +90,10 @@ impl<'a> VoltcraftStatistics<'a> {
     }
 
     pub fn blackout_stats(&self) -> BlackoutInfo {
-        let blackouts = &VoltcraftStatistics::compute_blackouts(&self.power_data);
+        let blackouts = &VoltcraftStatistics::compute_blackouts(self.power_data);
         let blackout_count = blackouts.len();
         let total_blackout_duration = blackouts
-            .into_iter()
+            .iter()
             .fold(Duration::zero(), |sum, x| sum + x.duration);
         BlackoutInfo {
             blackout_count,
@@ -120,51 +119,51 @@ impl<'a> VoltcraftStatistics<'a> {
             .power_data
             .iter()
             .filter(|d| *day == d.timestamp.date())
-            .map(|x| *x)
+            .cloned()
             .collect::<Vec<_>>();
         filtered_data
     }
 
     // Compute power stats on the given power events
-    fn compute_stats(power_items: &Vec<PowerEvent>) -> PowerStats {
+    fn compute_stats(power_items: &[PowerEvent]) -> PowerStats {
         // Total active power (in kWh) = (sum of instantaneous powers) / 60
-        let power_sum = power_items.into_iter().fold(0f64, |sum, x| sum + x.power);
+        let power_sum = power_items.iter().fold(0f64, |sum, x| sum + x.power);
         let total_active_power = power_sum / 60f64; // Total active power consumption (kWh)
         let avg_active_power = power_sum / power_items.len() as f64; // Average power (kW)
         let max_active_power = power_items
-            .into_iter()
+            .iter()
             .max_by(|a, b| a.power.partial_cmp(&b.power).unwrap())
             .unwrap(); // Maximum active power (kW)
 
         // Total apparent power (in kVAh) = (sum of instantaneous apparent powers) / 60
         let apparent_power_sum = power_items
-            .into_iter()
+            .iter()
             .fold(0f64, |sum, x| sum + x.apparent_power);
         let total_apparent_power = apparent_power_sum / 60f64; // Total apparent power consumption (kVAh)
         let avg_apparent_power = apparent_power_sum / power_items.len() as f64; // Average power (kVA)
         let max_apparent_power = power_items
-            .into_iter()
+            .iter()
             .max_by(|a, b| a.apparent_power.partial_cmp(&b.apparent_power).unwrap())
             .unwrap(); // Maximum apparent power (kVA)
 
         let min_voltage = power_items
-            .into_iter()
+            .iter()
             .min_by(|a, b| a.voltage.partial_cmp(&b.voltage).unwrap())
             .unwrap(); // Minimum voltage (V)
         let max_voltage = power_items
-            .into_iter()
+            .iter()
             .max_by(|a, b| a.voltage.partial_cmp(&b.voltage).unwrap())
             .unwrap(); // Maximum voltage (V)
-        let avg_voltage = &power_items.into_iter().fold(0f64, |sum, x| sum + x.voltage)
-            / power_items.len() as f64; // Average voltage (V)
+        let avg_voltage =
+            power_items.iter().fold(0f64, |sum, x| sum + x.voltage) / power_items.len() as f64; // Average voltage (V)
 
         let start = power_items
-            .into_iter()
+            .iter()
             .min_by(|a, b| a.timestamp.partial_cmp(&b.timestamp).unwrap())
             .unwrap()
             .timestamp; // Start timestamp
         let end = power_items
-            .into_iter()
+            .iter()
             .max_by(|a, b| a.timestamp.partial_cmp(&b.timestamp).unwrap())
             .unwrap()
             .timestamp; // End timestamp
@@ -183,7 +182,7 @@ impl<'a> VoltcraftStatistics<'a> {
     }
 
     // Compute blackout stats on the given power events
-    fn compute_blackouts(power_items: &Vec<PowerEvent>) -> Vec<PowerBlackout> {
+    fn compute_blackouts(power_items: &[PowerEvent]) -> Vec<PowerBlackout> {
         let mut blackouts = Vec::new();
         for (pe1, pe2) in power_items.iter().tuple_windows() {
             // If the gap between two subsequent timestamps is more than a minute, we've detected a blackout
