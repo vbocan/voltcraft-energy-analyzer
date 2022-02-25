@@ -1,16 +1,15 @@
 use crate::voltcraft::data::PowerEvent;
 use crate::voltcraft::stats::{BlackoutInfo, DailyPowerInfo, OverallPowerInfo};
-use csv;
 use std::fs::File;
 use std::io::{self, Write};
 
 pub fn save_parameter_history_txt(
     filename: &str,
-    power_events: &Vec<PowerEvent>,
+    power_events: &[PowerEvent],
 ) -> Result<(), io::Error> {
     let mut f = File::create(filename)?;
-    writeln!(f, "== PARAMETER HISTORY ==");
-    writeln!(f);
+    writeln!(f, "== PARAMETER HISTORY ==")?;
+    writeln!(f)?;
     for pe in power_events {
         writeln!(
             f,
@@ -21,14 +20,14 @@ pub fn save_parameter_history_txt(
             pe.power_factor,
             pe.power,
             pe.apparent_power
-        );
+        )?;
     }
     Ok(())
 }
 
 pub fn save_parameter_history_csv(
     filename: &str,
-    power_events: &Vec<PowerEvent>,
+    power_events: &[PowerEvent],
 ) -> Result<(), io::Error> {
     let mut wtr = csv::Writer::from_path(filename)?;
     wtr.write_record(&[
@@ -56,19 +55,19 @@ pub fn save_parameter_history_csv(
 pub fn save_statistics(
     filename: &str,
     overall_stats: &OverallPowerInfo,
-    daily_stats: &Vec<DailyPowerInfo>,
+    daily_stats: &[DailyPowerInfo],
     blackout_stats: &BlackoutInfo,
 ) -> Result<(), io::Error> {
     let mut f = File::create(filename)?;
     // Statistics for the entire period
-    writeln!(f, "==== OVERALL STATISTICS ==================");
+    writeln!(f, "==== OVERALL STATISTICS ==================")?;
     writeln!(
         f,
         "Interval: {}-{} ({})",
         overall_stats.start.format("[%Y-%m-%d %H:%M]"),
         overall_stats.end.format("[%Y-%m-%d %H:%M]"),
         format_duration(overall_stats.end - overall_stats.start)
-    );
+    )?;
     match overall_stats.avg_daily_power_consumption {
         None => {}
         Some(d) => {
@@ -78,16 +77,16 @@ pub fn save_statistics(
                 d,
                 d * 30.0,
                 d * 365.0
-            );
+            )?;
         }
     }
-    writeln!(f);
-    writeln!(f, "- ACTIVE POWER");
+    writeln!(f)?;
+    writeln!(f, "- ACTIVE POWER")?;
     writeln!(
         f,
         "Total energy consumption: {:.2}kWh.",
         overall_stats.stats.total_active_power
-    );
+    )?;
     writeln!(
         f,
         "Peak power was {:.2}kW and occured on {}.",
@@ -97,19 +96,19 @@ pub fn save_statistics(
             .max_active_power
             .timestamp
             .format("[%Y-%m-%d %H:%M]")
-    );
+    )?;
     writeln!(
         f,
         "Minute by minute average power: {:.2}kW.",
         overall_stats.stats.avg_active_power
-    );
-    writeln!(f);
-    writeln!(f, "- APPARENT POWER");
+    )?;
+    writeln!(f)?;
+    writeln!(f, "- APPARENT POWER")?;
     writeln!(
         f,
         "Total energy consumption: {:.2}kVAh.",
         overall_stats.stats.total_apparent_power
-    );
+    )?;
     writeln!(
         f,
         "Peak power was {:.2}kVA and occured on {}.",
@@ -119,14 +118,14 @@ pub fn save_statistics(
             .max_apparent_power
             .timestamp
             .format("[%Y-%m-%d %H:%M]")
-    );
+    )?;
     writeln!(
         f,
         "Minute by minute average power: {:.2}kVA.",
         overall_stats.stats.avg_apparent_power
-    );
-    writeln!(f);
-    writeln!(f, "- VOLTAGE");
+    )?;
+    writeln!(f)?;
+    writeln!(f, "- VOLTAGE")?;
     writeln!(
         f,
         "Minimum voltage was {:.1}V and occured on {}.",
@@ -136,7 +135,7 @@ pub fn save_statistics(
             .min_voltage
             .timestamp
             .format("[%Y-%m-%d %H:%M]")
-    );
+    )?;
     writeln!(
         f,
         "Maximum voltage was {:.1}V and occured on {}.",
@@ -146,16 +145,16 @@ pub fn save_statistics(
             .max_voltage
             .timestamp
             .format("[%Y-%m-%d %H:%M]")
-    );
+    )?;
     writeln!(
         f,
         "Minute by minute average voltage: {:.1}V.",
         overall_stats.stats.avg_voltage
-    );
-    writeln!(f);
-    writeln!(f);
+    )?;
+    writeln!(f)?;
+    writeln!(f)?;
 
-    writeln!(f, "==== DAILY STATISTICS ====================");
+    writeln!(f, "==== DAILY STATISTICS ====================")?;
     // Daily statistics
     for interval in daily_stats {
         writeln!(
@@ -164,7 +163,7 @@ pub fn save_statistics(
             interval.date.format("[%Y-%m-%d]"),
             format_duration(interval.stats.total_duration),
             interval.stats.total_duration.num_seconds() as f64 * 100.0 / 86400.0
-        );
+        )?;
         writeln!(
             f,
             "      Total active power: {:.2}kWh  | Average: {:.2}kW  | Maximum: {:.2}kW on {}",
@@ -176,7 +175,7 @@ pub fn save_statistics(
                 .max_active_power
                 .timestamp
                 .format("[%Y-%m-%d %H:%M]")
-        );
+        )?;
         writeln!(
             f,
             "    Total apparent power: {:.2}kVAh | Average: {:.2}kVA | Maximum: {:.2}kVA on {}",
@@ -188,7 +187,7 @@ pub fn save_statistics(
                 .max_active_power
                 .timestamp
                 .format("[%Y-%m-%d %H:%M]")
-        );
+        )?;
         writeln!(
             f,
             "    Voltage: Average: {:.1}V | Minimum: {:.1}V on {} | Maximum: {:.1}V on {}",
@@ -205,27 +204,27 @@ pub fn save_statistics(
                 .max_voltage
                 .timestamp
                 .format("[%Y-%m-%d %H:%M]")
-        );
-        writeln!(f);
+        )?;
+        writeln!(f)?;
     }
 
-    writeln!(f);
+    writeln!(f)?;
     // Blackout history
-    writeln!(f, "==== BLACKOUT HISTORY ====================");
+    writeln!(f, "==== BLACKOUT HISTORY ====================")?;
     writeln!(
         f,
         "{} blackout(s) for a total of {}.",
         blackout_stats.blackout_count,
         format_duration(blackout_stats.total_blackout_duration)
-    );
-    writeln!(f);
+    )?;
+    writeln!(f)?;
     for be in &blackout_stats.blackouts {
         writeln!(
             f,
             "{} Duration: {}",
             be.timestamp.format("[%Y-%m-%d %H:%M]"),
             format_duration(be.duration),
-        );
+        )?;
     }
     Ok(())
 }
