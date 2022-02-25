@@ -5,7 +5,7 @@ use colored::*;
 use glob::glob;
 use std::env;
 use std::fs;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 use voltcraft::data::{PowerEvent, VoltcraftData};
 use voltcraft::stats::VoltcraftStatistics;
 
@@ -85,7 +85,7 @@ fn main() {
             // Parse data
             if let Ok(mut pev) = vdf.parse() {
                 power_events.append(&mut pev);
-                file_count = file_count + 1;
+                file_count += 1;
                 println!(" {}", "Ok".green());
             } else {
                 println!(" {}", "Invalid".red());
