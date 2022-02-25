@@ -84,11 +84,11 @@ impl VoltcraftData {
     }
 
     fn decode_timestamp(&self, off: usize) -> chrono::DateTime<Local> {
-        let month: u8 = self.raw_data[off + 0].into();
-        let day: u8 = self.raw_data[off + 1].into();
-        let year: u8 = self.raw_data[off + 2].into();
-        let hour: u8 = self.raw_data[off + 3].into();
-        let minute: u8 = self.raw_data[off + 4].into();
+        let month: u8 = self.raw_data[off];
+        let day: u8 = self.raw_data[off + 1];
+        let year: u8 = self.raw_data[off + 2];
+        let hour: u8 = self.raw_data[off + 3];
+        let minute: u8 = self.raw_data[off + 4];
         chrono::Local
             .ymd(year as i32 + 2000, month as u32, day as u32)
             .and_hms(hour as u32, minute as u32, 0)
@@ -108,7 +108,7 @@ impl VoltcraftData {
         let current: f64 = current as f64 / 1000.0; // ampers
 
         // Decode power factor (1 byte)
-        let power_factor: u8 = self.raw_data[off + 4].into();
+        let power_factor: u8 = self.raw_data[off + 4];
         let power_factor: f64 = power_factor as f64 / 100.0; // cos phi
 
         let power = voltage * current * power_factor / 1000.0; // kW
