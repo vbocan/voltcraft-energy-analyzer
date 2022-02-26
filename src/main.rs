@@ -98,7 +98,7 @@ fn main() {
     // Process power events accrued from the parsed data files
     if !power_events.is_empty() {
         // Chronologically sort power items (we need this to spot power blackouts)
-        print!("Sorting power data...");        
+        print!("Sorting power data...");
         power_events.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
         println!(" {}", "Done".green());
         // Remove duplicate events based on timestamp
@@ -182,11 +182,11 @@ fn display_welcome() {
 
 fn display_help() {
     println!("{} <input folder> <output folder>\n\t- Decode Voltcraft files from a folder and output statistics in different folder.",
-        "voltcraft_energy_decoder".bright_white());
+        "voltcraft_energy_analyzer".bright_white());
     println!("{} <input folder>\n\t- Decode Voltcraft files from a folder and output statistics in the current folder.",
-        "voltcraft_energy_decoder".bright_white());
+        "voltcraft_energy_analyzer".bright_white());
     println!(
         "{}\n\t- Decode Voltcraft files from and place the statistics in the current folder.\n",
-        "voltcraft_energy_decoder".bright_white()
+        "voltcraft_energy_analyzer".bright_white()
     );
 }
