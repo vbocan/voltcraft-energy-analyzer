@@ -170,7 +170,7 @@ fn display_welcome() {
         "v1.0".bright_yellow().bold(),
         "(My first foray into the Rust programming language)".italic(),
         "Valer BOCAN, PhD, CSSLP".green(),
-        "https://github.com/vbocan/voltcraft-energy-decoder".blue()
+        "https://github.com/vbocan/voltcraft-energy-analyzer".blue()
     );
     println!(
         "Type {} | {} | {} to get help.\n",
