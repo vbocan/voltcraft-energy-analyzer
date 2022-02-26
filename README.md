@@ -15,6 +15,7 @@ The Energy Logger 4000's built-in memory logs the energy consumption of any conn
 - Voltage average with low and high detection.
 - Daily power statistics for the entire monitored time span.
 - Blackout detection
+- Automatic removal of duplicate files (useful for accidental multiple data dumps on the SD card)
 
 **Usage**
 You need Rust to build this tool. [Get it here.](https://rustup.rs/)
@@ -97,5 +98,5 @@ Minute by minute average voltage: 219.8V.
 [...]
 ```
 
-*This is my first foray into the Rust programming language. To the best of my knowledge, the code I've written is idiomatic. As I delve more into the Rust ecosystem, I am going to refine the code in this repository.*
+*This is my first foray into the Rust programming language. To the best of my knowledge, the code I've written is idiomatic, but as I delve more into the Rust ecosystem, I am going to refine the code in this repository.*
 **Valer Bocan, PhD, CSSLP**
