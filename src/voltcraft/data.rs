@@ -10,8 +10,8 @@ pub struct PowerEvent {
     pub voltage: f64,                       // volts
     pub current: f64,                       // ampers
     pub power_factor: f64,                  // cos(phi)
-    pub power: f64,                         //kW
-    pub apparent_power: f64,                //kVA
+    pub power: f64,                         // kW
+    pub apparent_power: f64,                // kVA
 }
 
 impl VoltcraftData {
@@ -99,8 +99,8 @@ impl VoltcraftData {
         let voltage: [u8; 2] = self.raw_data[off..off + 2].try_into().unwrap();
         let voltage = u16::from_be_bytes(voltage);
         let voltage: f64 = voltage as f64 / 10.0; // volts
-        assert!(voltage > 150.0, "Tensiune mică mare la offset {}", off);
-        assert!(voltage < 250.0, "Tensiune mare mare la offset {}", off);
+        assert!(voltage > 150.0, "Low voltage at offset {}", off);
+        assert!(voltage < 250.0, "High voltage at offset {}", off);
 
         // Decode current (2 bytes - Big Endian)
         let current: [u8; 2] = self.raw_data[off + 2..off + 4].try_into().unwrap();
