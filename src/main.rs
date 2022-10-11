@@ -15,6 +15,7 @@ const PARAMETER_HISTORY_FILE_TEXT: &str = "voltcraft_history.txt";
 const PARAMETER_HISTORY_FILE_CSV: &str = "voltcraft_history.csv";
 const STATS_FILE_TEXT: &str = "voltcraft_stats.txt";
 
+///Comentariu la functia main!!!
 fn main() {
     // Print welcome text
     display_welcome();

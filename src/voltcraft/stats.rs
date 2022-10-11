@@ -8,7 +8,7 @@ pub struct VoltcraftStatistics<'a> {
 }
 
 #[derive(Debug, Copy, Clone)]
-pub struct PowerStats {
+pub struct PowerStatistics {
     pub total_active_power: f64,      // total active power (kWh)
     pub avg_active_power: f64,        // average active power (kW)
     pub max_active_power: PowerEvent, // maxiumum active power
@@ -33,14 +33,14 @@ pub struct PowerBlackout {
 #[derive(Debug)]
 pub struct DailyPowerInfo {
     pub date: Date<Local>,
-    pub stats: PowerStats,
+    pub stats: PowerStatistics,
 }
 
 #[derive(Debug)]
 pub struct OverallPowerInfo {
     pub start: DateTime<Local>,
     pub end: DateTime<Local>,
-    pub stats: PowerStats,
+    pub stats: PowerStatistics,
     pub avg_daily_power_consumption: Option<f64>, // kWh
 }
 
@@ -125,7 +125,7 @@ impl<'a> VoltcraftStatistics<'a> {
     }
 
     // Compute power stats on the given power events
-    fn compute_stats(power_items: &[PowerEvent]) -> PowerStats {
+    fn compute_stats(power_items: &[PowerEvent]) -> PowerStatistics {
         // Total active power (in kWh) = (sum of instantaneous powers) / 60
         let power_sum = power_items.iter().fold(0f64, |sum, x| sum + x.power);
         let total_active_power = power_sum / 60f64; // Total active power consumption (kWh)
@@ -167,7 +167,7 @@ impl<'a> VoltcraftStatistics<'a> {
             .max_by(|a, b| a.timestamp.partial_cmp(&b.timestamp).unwrap())
             .unwrap()
             .timestamp; // End timestamp
-        PowerStats {
+        PowerStatistics {
             total_active_power,
             avg_active_power,
             max_active_power: *max_active_power,
