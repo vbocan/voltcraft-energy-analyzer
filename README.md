@@ -4,8 +4,6 @@
 ![Voltcraft Energy Logger 4000](./assets/voltcraft-energy-logger-4000.jpg)
 > The Energy Logger 4000's built-in memory logs the energy consumption of any connected appliance over a period of 6 months. You can transfer all readings to a PC using any standard SD/SDHC card for further analysis and record keeping, allowing you to detect any hidden power guzzlers, and helping you take appropriate action to save energy. The 3-line display shows electricity consumption, active/apparent power, power factor (cos phi), amperage, voltage and min/max usage. Energy Logger 4000 enables highly accurate readings of appliances operating at loads as little as 1.5 W - perfect to keep an eye on standby power consumption. A built-in backup battery makes sure no readings are lost as a result of power outages.
 
-[Purchase yours from here.](https://www.conrad.com/p/voltcraft-energy-logger-4000-energy-consumption-meter-selectable-energy-tariffs-energy-cost-calculator-125444)
-
 ## Features
 
 - Support for Voltcraft data files containing the minute by minute history of power characteristics.
